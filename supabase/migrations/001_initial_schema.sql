@@ -4,7 +4,7 @@
 -- ============================================================
 
 -- Extensions
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
 CREATE EXTENSION IF NOT EXISTS "vector";
 
 -- ============================================================
@@ -13,7 +13,7 @@ CREATE EXTENSION IF NOT EXISTS "vector";
 
 -- ─── Users ───────────────────────────────────────────────────
 CREATE TABLE users (
-  id                   UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   email                TEXT UNIQUE NOT NULL,
   display_name         TEXT NOT NULL,
   avatar_url           TEXT,
@@ -26,7 +26,7 @@ CREATE INDEX idx_users_email ON users(email);
 
 -- ─── Taste Profiles ──────────────────────────────────────────
 CREATE TABLE taste_profiles (
-  id                     UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id                     UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id                UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   spice_tolerance        INTEGER CHECK (spice_tolerance BETWEEN 1 AND 5) DEFAULT 3,
   adventurousness        INTEGER CHECK (adventurousness BETWEEN 1 AND 5) DEFAULT 3,
@@ -45,7 +45,7 @@ CREATE INDEX idx_taste_profiles_embedding ON taste_profiles USING hnsw (taste_em
 
 -- ─── Cuisine Preferences ─────────────────────────────────────
 CREATE TABLE cuisine_preferences (
-  id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   taste_profile_id UUID NOT NULL REFERENCES taste_profiles(id) ON DELETE CASCADE,
   cuisine_type     TEXT NOT NULL,
   preference_level TEXT NOT NULL CHECK (preference_level IN ('love','like','neutral','dislike')),
@@ -54,7 +54,7 @@ CREATE TABLE cuisine_preferences (
 
 -- ─── Dietary Restriction Types (reference data) ──────────────
 CREATE TABLE dietary_restriction_types (
-  id           UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name         TEXT UNIQUE NOT NULL,
   display_name TEXT NOT NULL,
   category     TEXT NOT NULL CHECK (category IN ('allergy','intolerance','diet','religious')),
@@ -64,7 +64,7 @@ CREATE TABLE dietary_restriction_types (
 
 -- ─── User Dietary Restrictions ───────────────────────────────
 CREATE TABLE user_dietary_restrictions (
-  id                    UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id               UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   restriction_type_id   UUID NOT NULL REFERENCES dietary_restriction_types(id),
   is_hard_constraint    BOOLEAN DEFAULT TRUE,
@@ -74,7 +74,7 @@ CREATE TABLE user_dietary_restrictions (
 
 -- ─── Restaurants ─────────────────────────────────────────────
 CREATE TABLE restaurants (
-  id                     UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id                     UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   google_place_id        TEXT UNIQUE NOT NULL,
   name                   TEXT NOT NULL,
   address                TEXT,
@@ -107,7 +107,7 @@ CREATE INDEX idx_restaurants_rating    ON restaurants(google_rating DESC);
 
 -- ─── Ratings ─────────────────────────────────────────────────
 CREATE TABLE ratings (
-  id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id           UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   restaurant_id     UUID NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
   overall_rating    INTEGER NOT NULL CHECK (overall_rating BETWEEN 1 AND 5),
@@ -125,7 +125,7 @@ CREATE TABLE ratings (
 
 -- ─── Groups ──────────────────────────────────────────────────
 CREATE TABLE groups (
-  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name        TEXT NOT NULL,
   created_by  UUID NOT NULL REFERENCES users(id),
   invite_code TEXT UNIQUE NOT NULL,
@@ -135,7 +135,7 @@ CREATE TABLE groups (
 );
 
 CREATE TABLE group_members (
-  id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   group_id   UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
   user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   role       TEXT NOT NULL CHECK (role IN ('owner','admin','member')) DEFAULT 'member',
@@ -145,7 +145,7 @@ CREATE TABLE group_members (
 
 -- ─── Group Sessions (state machine) ──────────────────────────
 CREATE TABLE group_sessions (
-  id                      UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   group_id                UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
   initiated_by            UUID NOT NULL REFERENCES users(id),
   status                  TEXT NOT NULL CHECK (status IN (
@@ -168,7 +168,7 @@ CREATE TABLE group_sessions (
 -- ─── Session Participants ─────────────────────────────────────
 -- user_id is nullable to support guest access (guest_display_name used instead)
 CREATE TABLE session_participants (
-  id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   session_id          UUID NOT NULL REFERENCES group_sessions(id) ON DELETE CASCADE,
   user_id             UUID REFERENCES users(id),           -- nullable for guest access
   guest_display_name  TEXT,
@@ -181,7 +181,7 @@ CREATE TABLE session_participants (
 
 -- ─── Recommendation Log ──────────────────────────────────────
 CREATE TABLE recommendation_log (
-  id             UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id        UUID REFERENCES users(id),
   session_id     UUID REFERENCES group_sessions(id),
   restaurant_id  UUID NOT NULL REFERENCES restaurants(id),
@@ -196,7 +196,7 @@ CREATE TABLE recommendation_log (
 
 -- ─── Additions: Favorite Restaurants ─────────────────────────
 CREATE TABLE user_favorite_restaurants (
-  id             UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id        UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   restaurant_id  UUID NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
   added_from     TEXT NOT NULL CHECK (added_from IN ('profile','onboarding','rating','detail')),
@@ -209,15 +209,15 @@ CREATE INDEX idx_user_favorites_user ON user_favorite_restaurants(user_id);
 
 -- ─── Additions: Favorite Dishes ──────────────────────────────
 CREATE TABLE user_favorite_dishes (
-  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   dish_name   TEXT NOT NULL,
   cuisine_tag TEXT,
-  created_at  TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(user_id, lower(dish_name))
+  created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE INDEX idx_user_dishes_user ON user_favorite_dishes(user_id);
+CREATE UNIQUE INDEX idx_user_dishes_unique ON user_favorite_dishes(user_id, lower(dish_name));
 
 
 -- ============================================================
